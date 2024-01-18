@@ -1,0 +1,134 @@
+---
+title: "Sleepy Floyd Code"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+[Nimble Documentation]("https://r-nimble.org/html_manual/cha-more-introduction.html")
+
+- `{nimble}` compiles the code to C++ so it's fast
+- `{jags}` ("Just Another Gibbs Sampler") does *not* compile (but its good for smaller problems)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nimble)
+library(coda)
+```
+
+
+For code below,
+- Nimble knows i is an iterator so we don't need to explicitly define it. 
+- `dbern` is a Bernoulli distribution ( the data model )
+- `dbeta` is a beta distribution ( the prior )
+- `~` is the "is distributed as" operator
+- `N` is the number of observations
+- `p` is the probability of success 
+- `y` is the vector of observations
+
+```{r}
+sleepyCode <- nimbleCode({
+  for (i in 1:N){
+      y[i] ~ dbern(p)
+}
+  p ~ dbeta(9,5)
+})
+```
+
+---  
+
+- f is the number of shots he missed (59)  
+- s is the number of shots he made (182)  
+- y is the vector of his shots (1 = made, 0 = missed)
+
+In nimble it's important to clearly define the data, constants, and initial values.  
+- initial values: 
+  - either specify specific value(s) or it will sample one from the prior
+  - initial values are not always needed
+- constants:
+  - things that don't change
+  - can be used to specify the number of treatments (100 total samples - 50 control/test )
+  
+```{r}
+f <- 59
+s <- 182
+y <- c(rep(1,s),rep(0,f)) 
+N <- length(y)
+
+sleepyData <- list(y=y)
+sleepyConsts <- list(N=N)
+sleepyInits <- list(list(p=.5),list(p=.6),list(p=.7),list(p=.8)) # initial values for each chain
+```
+
+----
+- there are other functions to use besides `nimble::nimbleMCMC` but this is the most common and works well for our purposes.
+- thinning:
+  - not everyone thins things. Fellingham does it to make the diagnostics easier(?). President Reese doesn't because he doesn't want to throw away data.
+- Information Criteria: Explains how well the model fits the data and the complexity of the model
+  - AIC: Akaike Information Criteria
+  - BIC: Bayesian Information Criteria
+  - WAIC: Widely Applicable Information Criteria
+
+```{r}
+# Run the MCMC
+sleepy.out <- nimbleMCMC(code=sleepyCode,
+                         constants=sleepyConsts,
+                         data=sleepyData,
+                         nchains=4,
+                         niter=5000, # number of samples to draw
+                         nburnin=1000, # throw away first 1000 samples
+                         thin=2, # keep every 2nd sample to break up auto-correlation
+                         samplesAsCodaMCMC = TRUE, # keeps samples with {coda} format
+                         summary=TRUE,
+                         WAIC=TRUE, # "Widely Applicable Information Criteria" from {nimble} 
+                         monitors=c('p')) # what parameters to monitor
+
+```
+
+----
+SUMMARY
+```{r}
+names(sleepy.out)
+sleepy.out$summary # summary of each chain's posterior distribution
+``` 
+
+---
+WAIC
+```{r}
+sleepy.out$WAIC # WAIC info for each chain
+names(sleepy.out$samples) # the chains
+
+```
+
+---
+DIAGNOSTICS
+- `gelman.diag` (Gelman-Rubin diagnostic): measures how close the chains are to the point. We want it to be close to 1. Sometimes called the "R hat" $\hat{R}$
+- `raftery.diag` (Raftery-Lewis diagnostic): measures how many samples are needed to get a good estimate? We want it to be small? 
+  - Fellingham likes a Dependence factor cutoff of around 3?
+- `effectiveSize` (effective sample size)
+- converting to matrix
+  - makes things easier for `rafferty.diag`
+  - makes an $n \times p$ matrix where $n$ is sum of the length of every chain and $p$ is the number of parameters
+
+
+```{r}
+gelman.diag(sleepy.out$samples) 
+raftery.diag(sleepy.out$samples) # not enough samples so turn to matrix
+effectiveSize(sleepy.out$samples)
+allsamps <- as.matrix(sleepy.out$samples) # adds all samples to a matrix
+dim(allsamps) 
+raftery.diag(allsamps) # works with matrix
+```
+
+--- 
+PLOT
+- Red Line: `curve(dbeta(...),...)`
+  - `shape1`: 191 = 182 season makes + 9 makes from one game (see 2.2.2 in book)
+  - `shape2`: 64 = 59 season misses + 5 misses from one game (see 2.2.2 in book)
+  
+```{r}
+plot(density(allsamps,adjust=2)) # MCMC posterior
+curve(dbeta(x,shape1=191,shape2=64),add=TRUE,col='red',lty=2) 
+
+```
+
