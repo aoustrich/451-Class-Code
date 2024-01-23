@@ -99,23 +99,32 @@ sleepy.out$WAIC # WAIC info for each chain
 names(sleepy.out$samples) # the chains
 
 ```
+- `lppd`: log posterior  (measures fit)
+- `pWAIC`: penalty for WAIC? (measures complexity)
+
+$WAIC = -2 \times lppd + 2 \times pWAIC$ ?? 
 
 ---
 DIAGNOSTICS
-- `gelman.diag` (Gelman-Rubin diagnostic): measures how close the chains are to the point. We want it to be close to 1. Sometimes called the "R hat" $\hat{R}$
-- `raftery.diag` (Raftery-Lewis diagnostic): measures how many samples are needed to get a good estimate? We want it to be small? 
-  - Fellingham likes a Dependence factor cutoff of around 3?
+- `gelman.diag` (Gelman-Rubin diagnostic): measures how close the chains are converging to the same point. We want it to be close to 1. Sometimes called the "R hat" $\hat{R}$
+- `raftery.diag` (Raftery-Lewis diagnostic) "Are we comfortable in the tails?":  measures how many samples are needed to get a good estimate? Raftery said Dependence factor less than 5 is good
+  - Fellingham likes a Dependence factor less than 3?
 - `effectiveSize` (effective sample size)
+    - Fellingham thinks effective sample size of 5,000 is good.
 - converting to matrix
   - makes things easier for `rafferty.diag`
   - makes an $n \times p$ matrix where $n$ is sum of the length of every chain and $p$ is the number of parameters
 
 
 ```{r}
+# Posterior Diagnostics are from {coda}
 gelman.diag(sleepy.out$samples) 
+
 raftery.diag(sleepy.out$samples) # not enough samples so turn to matrix
-effectiveSize(sleepy.out$samples)
-allsamps <- as.matrix(sleepy.out$samples) # adds all samples to a matrix
+effectiveSize(sleepy.out$samples) # effective sample size 
+
+# add all chaiins to a matrix
+allsamps <- as.matrix(sleepy.out$samples) 
 dim(allsamps) 
 raftery.diag(allsamps) # works with matrix
 ```
