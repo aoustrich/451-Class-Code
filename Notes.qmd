@@ -1,0 +1,17 @@
+---
+title: "Notes"
+author: "Aaron Oustrich"
+format: html
+editor: visual
+---
+
+## Misc. Quotes
+
+-   "The distribution of the ratios is the ratio of the distributions"
+-   "Central Limit Theorem for Bayesians: As sample size increases the posteriors become more normal"
+
+## Nimble
+
+## Diagnostics
+
+-   
