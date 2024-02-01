@@ -5,13 +5,45 @@ format: html
 editor: visual
 ---
 
-## Misc. Quotes
+# Misc. Quotes
 
 -   "The distribution of the ratios is the ratio of the distributions"
 -   "Central Limit Theorem for Bayesians: As sample size increases the posteriors become more normal"
 
-## Nimble
+# Diagnostics
 
-## Diagnostics
+### Gelman-Rubin diagnostic (`coda::gelman.diag`):
 
--   
+-   The ratio of the variance of the posterior distribution to the mean of the posterior distribution. Measures how close the chains are converging to the same point. We want it to be close to 1. Sometimes called $\hat{R}$ (especially in STAN)
+
+-   There must be at least 2 chains to work
+
+### Raftery-Lewis diagnostic (`coda::raftery.diag`)
+
+-   "Are we comfortable in the tails?": measures how many samples are needed to get a good estimate? Raftery said Dependence factor less than 5 is good - Fellingham likes a Dependence factor less than 3?
+
+-   converting to matrix makes things easier for `rafferty.diag`. `as.matrix` makes an $n \times p$ matrix where $n$ is sum of the length of every chain and $p$ is the number of parameters
+
+### Effective Sample Size (`effectiveSize`:
+
+-   This [article](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6305549/#:~:text=2.8.-,Effective%20Sample%20Size,-The%20Effective%20Sample) say the ESS "measures the information content, or effectiveness of a sample chain."
+    -   Fellingham thinks effective sample size of 5,000 is good.
+-   The effective sample size is a function of Autocorrelation. As autocorellation increases, the effective sample size decreases. So if the autocorrelation is messing up the effective sample size, then thinning more might help.
+
+### Autocorrelation (`coda::autocorr.diag`)
+
+-   When the autocorrelation is negative, "some of the diagnostics do funny things" ex: like where the effective size is greater than the number of samples.
+-   `autocorr.diag(as.mcmc(allsamps))` where `allsamps` is a matrix of all the samples and `coda::as.mcmc` converts it to a `mcmc` object (don't understand why it's important other than it's a requirement for `autocorr.diag`)
+
+### Watanabe-Akaike Information Criterion ('Widely Available Information Criterion' or WAIC)
+
+-   Want this to be small
+-   `lppd` (log-predictive density?): Measures the quality of fit of the model
+    -   `Deviance` = -2 \* `lppd`
+-   `pWAIC`: Penalty for more complex model
+
+# Prior Distributions
+
+#### Gamma
+
+-   Fellingham prefers shape \> 1 so the curve "flips over" instead of going up to $\infty$ as $x \to 0$

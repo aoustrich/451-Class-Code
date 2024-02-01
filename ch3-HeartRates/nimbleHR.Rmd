@@ -14,19 +14,10 @@ dat <- read.table('../data/hr.dat',header=TRUE)
 hr <- dat$hr
 ```
 
------
-# General Notes
-
-
-# Fellingham Notes
-- For Gamma distributions, prefers shape > 1 so the curve "flips over" as shown below
-```{r}
-curve(dgamma(x,1,.1),from=0,to=40)
-curve(dgamma(x,1.1,.1),from=0,to=40,add=TRUE, col="red")
-```
-
-
----- 
+|                                                                                                            |
+|-------|
+| \# General Notes                                                                                           |
+| \# Fellingham Notes - For Gamma distributions, prefers shape \> 1 so the curve "flips over" as shown below |
 
 # Nimble Code for Heart Rate
 
@@ -58,6 +49,7 @@ hr.out <- nimbleMCMC(code=hrCode,
 ```
 
 # Diagnostics
+
 ```{r}
 names(hr.out)
 hr.out$summary
@@ -74,10 +66,13 @@ ss <- allsamps[,2]
 raftery.diag(allsamps)
 
 ```
---- 
+
+------------------------------------------------------------------------
+
 # Autocorrelation
 
 When the autocorrelation is negative, "some of the diagnostics do funny things" like where the effective size is greater than the number of samples. (This isn't the case here as shown below).
+
 ```{r}
 autocorr.diag(as.mcmc(allsamps))
 
@@ -85,6 +80,7 @@ effectiveSize(as.mcmc(allsamps))
 ```
 
 # Posterior Summary Statistics
+
 ```{r}
 summary(m)
 quantile(m, c(.025,.975)) # 95% credible interval for m
@@ -94,8 +90,8 @@ quantile(ss, c(.025,.975)) # 95% credible interval for ss
 
 ```
 
-
 # Plots
+
 ```{r}
 plot(density(m,adjust=2))
 plot(density(ss,adjust=2))
@@ -107,11 +103,11 @@ plot(ss,type='l')
 ![bad haircut trace](haircutTrace.png)
 
 # Coeffecient of Variation
+
 A ratio of the standard deviation to the mean.
+
 ```{r}
 cv <- ss/m
 summary(cv)
 plot(density(cv,adjust=2))
 ```
-
-

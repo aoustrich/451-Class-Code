@@ -1,0 +1,143 @@
+---
+title: "MAP"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nimble)
+library(coda)
+
+map <- read.table('../data/map.dat',header=TRUE)
+```
+
+
+## 2 variance model
+```{r}
+map2Code <- nimbleCode({
+  for (i in n1:n){
+    y[i] ~ dnorm(mu[tmt[i]],sd=s[tmt[i]])
+  }
+  for (j in n1:n2){
+    mu[j]~ dnorm(120,sd=20)
+    s[j] ~ dgamma(1.1,.1)
+  }
+})
+
+map2Consts <- list(n=30,n1=1,n2=2,tmt=map$tmt)
+map2Data <- list(y=map$response)
+
+# nimbleOptions(showCompilerOutput = TRUE)
+map2.out <- nimbleMCMC(code=map2Code,
+                     constants=map2Consts,
+                     data=map2Data,
+                     nchains=4,
+                     niter=16000,
+                     nburnin=1000,
+                     thin=5,
+                     samplesAsCodaMCMC = TRUE,
+                     summary=TRUE, WAIC=TRUE,
+                     monitors=c('mu','s'),)
+```
+
+```{r}
+names(map2.out)
+map2.out$summary
+map2.out$WAIC
+names(map2.out$samples)
+```
+
+``` {r}
+gelman.diag(map2.out$samples)
+allsamps2 <- as.matrix(map2.out$samples)
+dim(allsamps2)
+mu1 <- allsamps2[,1]
+mu2 <- allsamps2[,2]
+sd1 <- allsamps2[,3]
+sd2 <- allsamps2[,4]
+raftery.diag(allsamps2)
+effectiveSize(allsamps2)
+autocorr.diag(as.mcmc(allsamps2))
+```
+
+``` {r}
+plot(density(mu1,adjust=2))
+plot(mu1,type='l')
+mean(mu1-mu2>0)
+plot(density(sd1,adjust=2))
+mean((sd1/sd2)>2)
+
+var1 <- sd1^2
+var2 <- sd2^2
+mean((var1/var2)>4)
+```
+
+
+
+## Shared Variance Model - 1 Variance
+```{r}
+map1Code <- nimbleCode({
+  for (i in n1:n){
+    y[i] ~ dnorm(mu[tmt[i]],sd=s)
+  }
+  
+  s ~ dgamma(1.1,.1)
+  
+  for (j in n1:n2){
+    mu[j]~ dnorm(120,sd=20)
+  }
+    
+  
+})
+
+map1Consts <- list(n=30,n1=1,n2=2,tmt=map$tmt)
+map1Data <- list(y=map$response)
+
+map1.out <- nimbleMCMC(code=map1Code,
+                     constants=map1Consts,
+                     data=map1Data,
+                     nchains=4,
+                     niter=16000,
+                     nburnin=1000,
+                     thin=5,
+                     samplesAsCodaMCMC = TRUE,
+                     summary=TRUE, WAIC=TRUE,
+                     monitors=c('mu','s'))
+```
+
+
+```{r}
+names(map1.out)
+map1.out$summary
+map1.out$WAIC
+names(map1.out$samples)
+```
+
+``` {r}
+gelman.diag(map1.out$samples)
+allsamps1 <- as.matrix(map1.out$samples)
+dim(allsamps1)
+mu1 <- allsamps1[,1]
+mu2 <- allsamps1[,2]
+sd1 <- allsamps1[,3]
+# sd2 <- allsamps2[,4]
+raftery.diag(allsamps1)
+effectiveSize(allsamps1)
+autocorr.diag(as.mcmc(allsamps1))
+
+```
+
+``` {r}
+plot(density(mu1,adjust=2))
+plot(mu1,type='l')
+mean(mu1-mu2>0)
+plot(density(sd1,adjust=2))
+# mean((sd1/sd2)>2)
+
+var1 <- sd1^2
+# var2 <- sd2^2
+# mean((var1/var2)>4)
+```
