@@ -1,0 +1,81 @@
+---
+title: "Nimble Heart Rates"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nimble)
+library(coda)
+
+# dat <- read.table('../data/hr.dat',header=TRUE)
+# hr <- dat$hr
+
+# data?
+set.seed(3901)
+mu.af <- rnorm(n = 1, mean = 5, sd = 2)
+sigma <- abs(rcauchy(n = 1, location = 0, scale = 1))
+mu.af
+sigma
+```
+
+
+```{r}
+anovaCode <- nimbleCode({
+  for (i in 1:N){
+    years_af[i] ~ dnorm(mu_af,sd=ss)
+    years_uf[i] ~ dnorm(mu_uf,sd=ss)
+    years_am[i] ~ dnorm(mu_am,sd=ss)
+    years_um[i] ~ dnorm(mu_um,sd=ss)
+  }
+  mu_af ~ dnorm(5,sd=2)
+  mu_uf ~ dnorm(5,sd=2)
+  mu_am ~ dnorm(5,sd=2)
+  mu_um ~ dnorm(5,sd=2)
+  ss ~ dexp(2)
+})
+
+aovConsts <- list(N=60)
+
+aovData <- list(years_af=attract_dat$years_af,
+                years_uf=attract_dat$years_uf,
+                years_am=attract_dat$years_am,
+                years_um=attract_dat$years_um)
+
+aov.out <- nimbleMCMC(code=anovaCode,
+                      constants=aovConsts,
+                      data = aovData,
+                      nchains=4,
+                      niter=8000,
+                      nburnin=2000,
+                      thin=2,
+                      samplesAsCodaMCMC=TRUE,
+                      summary=TRUE,
+                      WAIC=TRUE,
+                      monitors = c('mu_af','mu_uf','mu_am','mu_um','ss'))
+```
+
+
+```{r}
+aov.out$summary
+aov.out$WAIC
+library(coda)
+gelman.diag(aov.out$samples)
+allsamps <- as.matrix(aov.out$samples)
+raftery.diag(allsamps)
+effectiveSize(allsamps)
+allsamps[1,]
+mu_af <- allsamps[,1]
+mu_am <- allsamps[,2]
+mu_uf <- allsamps[,3]
+mu_um <- allsamps[,4]
+ss <- allsamps[,5]
+```
+
+``` {r}
+plot(density(mu_um,adjust=2))
+mean(mu_um>mu_af)
+```
+

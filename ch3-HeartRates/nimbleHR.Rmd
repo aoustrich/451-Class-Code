@@ -14,10 +14,6 @@ dat <- read.table('../data/hr.dat',header=TRUE)
 hr <- dat$hr
 ```
 
-|                                                                                                            |
-|-------|
-| \# General Notes                                                                                           |
-| \# Fellingham Notes - For Gamma distributions, prefers shape \> 1 so the curve "flips over" as shown below |
 
 # Nimble Code for Heart Rate
 
