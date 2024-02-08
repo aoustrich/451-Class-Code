@@ -1,0 +1,67 @@
+---
+title: "Frequentist v. Bayesian ANOVA"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Frequentist example of ANOVA
+```{r}
+advert <- read.table('../data/advert.dat')
+
+names(advert) <- c('sales','price','adv','tmt')
+
+names$price <- as.factor(price)
+
+fit <- lm(sales ~ price + adv + price*adv, data=advert)
+anova(fit)
+
+```
+
+## Create the W matrix - the "stretched identity"
+```{r}
+W <- model.matrix(~ -1 + price + adv + price*adv, data=advert) # -1 removes the intercept
+
+```
+
+## Calculate the cell means
+```{r}
+cell_means <- solve(t(W) %*% W) %*% t(W) %*% advert$sales
+```
+
+## Create A matrix
+```{r}
+A <- rbind(c(1/6,1/6,1/6,1/6,1/6,1/6),
+           c(1/3,1/3,1/3,-1/3,-1/3,-1/3),
+           c(1/2,-1/2,0,1/2,-1/2,0),
+           c(1/2, 0, -1/2, 1/2, 0, -1/2),
+           c(1,-1,0,-1,1,0),
+           c(1,0,-1,-1,0,1)
+           )
+```
+
+## Make X matrix
+```{r}
+X <- W%*%solve(A)
+```
+
+## Get $\hat{\beta}$
+```{r}
+mean_hat <- solve(t(X) %*% X) %*% t(X) %*% advert$sales
+# or 
+A%*%mean_hat
+```
+
+# Running Tests
+
+```{r}
+
+```
+
+
+
+

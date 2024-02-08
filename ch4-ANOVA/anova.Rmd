@@ -14,12 +14,19 @@ library(coda)
 # hr <- dat$hr
 
 # data?
-set.seed(3901)
-mu.af <- rnorm(n = 1, mean = 5, sd = 2)
-sigma <- abs(rcauchy(n = 1, location = 0, scale = 1))
-mu.af
-sigma
+# set.seed(3901)
+# mu.af <- rnorm(n = 1, mean = 5, sd = 2)
+# sigma <- abs(rcauchy(n = 1, location = 0, scale = 1))
+# mu.af
+# sigma
+
+
+
+
 ```
+
+
+
 
 
 ```{r}
@@ -39,10 +46,10 @@ anovaCode <- nimbleCode({
 
 aovConsts <- list(N=60)
 
-aovData <- list(years_af=attract_dat$years_af,
-                years_uf=attract_dat$years_uf,
-                years_am=attract_dat$years_am,
-                years_um=attract_dat$years_um)
+aovData <- list(years_af=advert$years_af,
+                years_uf=advert$years_uf,
+                years_am=advert$years_am,
+                years_um=advert$years_um)
 
 aov.out <- nimbleMCMC(code=anovaCode,
                       constants=aovConsts,
