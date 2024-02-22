@@ -7,14 +7,21 @@ editor: visual
 
 # Misc. Quotes
 
--   "The distribution of the ratios is the ratio of the distributions"
--   "Central Limit Theorem for Bayesians: As sample size increases the posteriors become more normal"
+-   "The distribution of the ratios is the ratio of the distributions."
+-   "Central Limit Theorem for Bayesians: As sample size increases the posteriors become more normal."
+-   "I don't give a rip about unbiased estimators!"
+-   "We've got certain laws about probability. Bayesians follow them, Frequentists don't."
+
+# Bayes v. Frequentist
+
+-   Frequentists treat parameters as fixed but unknown. Bayesians treat parameters as random variables.
+-   Having unbiased estimators sounds good but they're unbiased to infinity. When we get a single Frequentist estimate we don't know it is unbiased - confidence intervals are in the long run. To account for the violation of the laws of probability Frequentists introduced confidence intervals and null hypothesis testing. Bayesians don't have to do that because they follow the laws of probability.
 
 # Diagnostics
 
 ### Gelman-Rubin diagnostic (`coda::gelman.diag`):
 
--   The ratio of the variance of the posterior distribution to the mean of the posterior distribution. Measures how close the chains are converging to the same point. We want it to be close to 1. Sometimes called $\hat{R}$ (especially in STAN)
+-   The ratio of the variance of the posterior distribution to the mean of the posterior distribution. Measures how close the chains are converging to the same point. We want upper confidence intervals to be close to 1. Sometimes called $\hat{R}$ (especially in STAN)
 
 -   There must be at least 2 chains to work
 
@@ -47,3 +54,5 @@ editor: visual
 #### Gamma
 
 -   Fellingham prefers shape \> 1 so the curve "flips over" instead of going up to $\infty$ as $x \to 0$
+
+# ANOVA/ANCOVA
