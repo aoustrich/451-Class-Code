@@ -1,0 +1,144 @@
+---
+title: "Nimble Heart Rates"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nimble)
+library(coda)
+
+advert <- read.table('../data/advert.dat')
+
+names(advert) <- c('sales','price','adv','tmt')
+
+advert$price <- as.factor(advert$price)
+advert$adv <- as.factor(advert$adv)
+```
+w
+```{r}
+anovaCode <- nimbleCode({
+  for (i in 1:N){
+    sales[i]~dnorm(mu[tmt[i]],sd=ss)
+  }
+  
+  for (i in 1:Ntmts){
+    mu[i] ~ dunif(200,2000)
+  }
+  
+  #changed this from dgamma(2,0.005) 
+  ss ~ dgamma(1.4,0.003)
+})
+
+aovConsts <- list(N=18, Ntmts=6)
+
+aovData <- list(sales = advert$sales,
+                tmt = advert$tmt)
+
+aov.out <- nimbleMCMC(code=anovaCode,
+                      constants=aovConsts,
+                      data = aovData,
+                      nchains=4,
+                      niter=40000,
+                      nburnin=10000,
+                      thin=20,
+                      samplesAsCodaMCMC=TRUE,
+                      summary=TRUE,
+                      WAIC=TRUE,
+                      monitors = c('mu','ss'))
+```
+
+```{r}
+aov.out$summary
+aov.out$WAIC
+
+gelman.diag(aov.out$samples)
+allsamps <- as.matrix(aov.out$samples)
+raftery.diag(allsamps)
+effectiveSize(allsamps)
+
+autocorr.diag(as.mcmc(allsamps))
+```
+# Testing Linear combinations of cell means
+```{r}
+m59r <- allsamps[,1]
+m59n <- allsamps[,2]
+m60r <- allsamps[,3]
+m60n <- allsamps[,4]
+m64r <- allsamps[,5]
+m64n <- allsamps[,6]
+ss <- allsamps[,7]
+
+rvn <- (m59r + m60r +m64r )/3 - (m59n +m60n +m64n)/3
+
+mean(rvn>0) # "one-sided" test
+quantile(rvn, c(0.025,0.975))
+```
+
+```{r}
+m5960v64 <- (m59r +m59n+m60r+m60n)/4 - (m64r+m64n)/2
+plot(density(m5960v64))
+```
+
+# Prior Predictive Distribution
+
+DON'T use densities for data - `plot(density(prior.pred))` 
+
+```{r}
+prior.pred <- rnorm(1000, mean=runif(1000,200,2000), sd=rgamma(1000,3,0.01))
+
+# check with subject matter expert to verify this is good
+hist(prior.pred) 
+
+# info about the prior pred
+mean(prior.pred>0)
+quantile(prior.pred, c(0.025,0.975))
+
+# tweaking the gamma 
+curve(dgamma(x,3,0.01), from=0, to=1000)
+```
+
+# Posterior Predictive Distributions
+
+AFTER rerunning the nimble code
+```{r}
+post.pred1 <- rnorm(6000, mean=allsamps[,1], sd=allsamps[,7]) # 6000 for nrows in allsamps
+# plot points from the data to check how 'precise' our posterior is
+hist(post.pred1)
+points(1532,0)
+points(1059,0)
+points(960,0)
+
+post.pred2 <- rnorm(6000, mean=allsamps[,2], sd=allsamps[,7]) # 6000 for nrows in allsamps
+hist(post.pred2)
+points(1004,0)
+points(1046,0)
+points(1101,0)
+
+post.pred3 <- rnorm(6000, mean=allsamps[,3], sd=allsamps[,7]) # 6000 for nrows in allsamps
+hist(post.pred3)
+points(1466,0)
+points(1070,0)
+points(1036,0)
+
+post.pred4 <- rnorm(6000, mean=allsamps[,4], sd=allsamps[,7]) # 6000 for nrows in allsamps
+hist(post.pred4)
+points(1049,0)
+points(887,0)
+points(925,0)
+
+post.pred5 <- rnorm(6000, mean=allsamps[,5], sd=allsamps[,7]) # 6000 for nrows in allsamps
+hist(post.pred5)
+points(713,0)
+points(897,0)
+points(504,0)
+
+post.pred6 <- rnorm(6000, mean=allsamps[,6], sd=allsamps[,7]) # 6000 for nrows in allsamps
+hist(post.pred6)
+points(341,0)
+points(201,0)
+points(519,0)
+```
+

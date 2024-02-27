@@ -11,11 +11,21 @@ editor: visual
 -   "Central Limit Theorem for Bayesians: As sample size increases the posteriors become more normal."
 -   "I don't give a rip about unbiased estimators!"
 -   "We've got certain laws about probability. Bayesians follow them, Frequentists don't."
+-   "Statisticians are the gatekeepers of science."
+-   "The biggest mistake we can make is thinking we know more than we do. It's sometimes better to have higher prior standard deviations because that bias means we don't know as much as we think we do."
+
+
+# Fellingham Particulars
+
+-   Use density plots for parameters and histograms for data (see ch5-ANOVA/anova_predictiveDistributions.Rmd)
+-   Effective size for MCMC should be 5,000 +
+- 
 
 # Bayes v. Frequentist
 
 -   Frequentists treat parameters as fixed but unknown. Bayesians treat parameters as random variables.
 -   Having unbiased estimators sounds good but they're unbiased to infinity. When we get a single Frequentist estimate we don't know it is unbiased - confidence intervals are in the long run. To account for the violation of the laws of probability Frequentists introduced confidence intervals and null hypothesis testing. Bayesians don't have to do that because they follow the laws of probability.
+-   Bayesians get a better understanding of the whole system and capture more of the variability. Frequentists get a point-estimate of the variance and believe it is the truth, but Bayesians get a distribution of the variance and understand the variability.
 
 # Diagnostics
 
@@ -49,10 +59,24 @@ editor: visual
     -   `Deviance` = -2 \* `lppd`
 -   `pWAIC`: Penalty for more complex model
 
-# Prior Distributions
+# Distributions
 
 #### Gamma
 
 -   Fellingham prefers shape \> 1 so the curve "flips over" instead of going up to $\infty$ as $x \to 0$
 
-# ANOVA/ANCOVA
+# Predictive Distributions
+
+## Prior Predictive
+
+Plot a histogram of data sampled from the likelihood function using the prior distribution(s) for each parameter. This is a way to check if the prior is reasonable.
+
+ex: for a normal likelihood - `rnorm(1000, mean=runif(1000,200,2000), sd=rgamma(1000,3,0.01))` where $\mu \sim U(200,2000)$ and $\sigma^2 \sim \Gamma(3,0.01)$. Choosing 1000 samples is arbitrary.
+
+## Posterior Predictive
+
+For each parameter in the posterior chains:
+-   Sample `r = nrows of allsamps` values from the likelihood using the each chain of the parameters from the MCMC
+
+ex: for a normal likelihood - `rnorm(6000, mean=allsamps[,1], sd=ss)` where `allsamps` is a matrix of all the samples from the MCMC and `ss` is the column for the shared variances.
+
