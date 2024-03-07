@@ -20,7 +20,6 @@ pages <- book$Pages.X.
 plot(pages, price, ylim=c(-50, 220))
 ```
 
-
 ```{r}
 N <- length(price)
 linregCode <- nimbleCode({

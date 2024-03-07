@@ -13,6 +13,8 @@ editor: visual
 -   "We've got certain laws about probability. Bayesians follow them, Frequentists don't."
 -   "Statisticians are the gatekeepers of science."
 -   "The biggest mistake we can make is thinking we know more than we do. It's sometimes better to have higher prior standard deviations because that bias means we don't know as much as we think we do."
+-   "Welp... just another indicator that I'm an idiot."
+-   "Matt let me make this clear to you: You CANNOT damage your reputation... It's already down here."
 
 
 # Fellingham Particulars

@@ -1,0 +1,271 @@
+---
+title: "Bayesian Regression"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nimble)
+library(coda)
+
+book <- read.table('../data/BookCost.dat', header=TRUE)
+price <- book$Price
+pages <- book$Pages
+N <- length(price)
+```
+
+# Nimble Code for Linear Regression
+
+We want to replicate `lm(price ~ pages, data=book)` using nimble. 
+
+We didn't have the data when writing this code so Fellingham says this is a perfect scenario for coming up with priors. People in the class chose the values for the priors (I don't know if I agree with them). 
+
+```{r}
+linRegCode <- nimbleCode({
+  # Likelihood
+  for (i in 1:N){
+    price[i] ~ dnorm(mean = mu[i], sd = s)
+    
+    # Now we need to connect the mean value with the model
+      # each mu[i] is the point estimate for the price of the i'th book
+    mu[i] <- intercept + slope*pages[i]
+  }
+  
+  # Priors
+  intercept ~ dunif(-100,500)
+  slope ~ dunif(-5,15) # or dnorm(5, sd = 3) could be another option
+  s ~  dgamma(2,.05)
+  
+})
+
+
+bookConsts <- list(N=N, pages=pages)
+bookData <- list(price=price)
+
+
+# No data so couldn't run
+book.out <- nimbleMCMC(code=linRegCode,
+                         constants=bookConsts,
+                         data=bookData,
+                         nchains=5,
+                         niter=50000, # 5000 originally (see raftery.diag below)
+                         nburnin=10000, # 1000 originally
+                         thin=20, # 2 originally
+                         samplesAsCodaMCMC = TRUE,
+                         summary=TRUE,
+                         WAIC=TRUE,
+                         monitors=c('intercept','slope','s'))
+```
+
+# Diagnostics
+
+We didn't have the data so we couldn't check these
+
+## Gelman
+```{r}
+gelman.diag(book.out$samples)  # looks good
+allsamps <- as.matrix(book.out$samples)
+```
+
+## Raftery
+
+There is a natural auto-correlation between slope and intercept so the dependence factors were bad. To fix this, we changed niter, nburnin, and thin above in the code above.
+```{r}
+raftery.diag(allsamps) # these were bad
+cor(allsamps[,1],allsamps[,3]) # in his example this was -0.8467
+```
+
+## Effective Size
+```{r}
+effectiveSize(allsamps)
+```
+
+## Trace Plots
+
+Fellingham emphasized that we should check the trace plots to prepare for the exam
+```{r}
+# nimble returns the chains in alphabetical order
+plot(allsamps[,1], type='l') # intercept
+plot(allsamps[,2], type='l') # s 
+plot(allsamps[,3], type='l') # slope
+```
+
+## MCMC Summary
+```{r}
+book.out$summary
+```
+
+## Plots
+
+```{r}
+# This (xx) gets you x-coordinates to build confidence intervals around.
+# The sequencing is arbitrary. Play around with different values.
+xx <- seq(0, 1100, by=50)
+
+# Plot the first line
+plot(xx, allsamps[1,1] + allsamps[1,3]*xx, type="l", ylim=c(-50,220),
+     xlab = "pages", ylab="price")
+
+# This for-loops simulates the rest of the lines
+# Gives some idea of how much variability is in the lines
+for(i in 2:1000){
+  abline(allsamps[i,1], allsamps[i,3], col="lightgray")
+}
+
+# This for-loop gets you y-coordinates to build confidence intervals around.
+test <- matrix(0, 1000, 23)
+for(i in 1:1000){
+  for(j in 1:23){
+    test[i,j] <- allsamps[i,1] + allsamps[i,3]*xx[j]
+  }
+}
+
+test1 <- apply(test, 2, quantile, c(.025,.975))
+
+# Lower Conf. Int
+lines(xx, test1[1,], lty=2, col = "blue")
+
+# Upper Conf. Int
+lines(xx, test1[2,], lty=2, col = "blue")
+
+# Line of Best Fit
+abline(mean(allsamps[,1]), mean(allsamps[,3]))
+
+# Actual Data Points
+points(pages, price)
+
+# Collect Posterior Predictive Points
+testp <- matrix(0, 1000, 23)
+for(i in 1:1000){
+  for(j in 1:23){
+    testp[i,j] <- rnorm(1, allsamps[i,1] + allsamps[i,3]*xx[j], allsamps[i,2])
+  }
+}
+test2 <- apply(testp, 2, quantile, c(.025, .975))
+
+# Lower Prediction Int.
+lines(xx, test2[1,], lty=2, col = "red")
+
+# Upper Prediction Int.
+lines(xx, test2[2,], lty=2, col = "red")
+```
+
+
+# Heteroskedasticity with an exponential variance model
+
+Not really needed for this problem but this is how we would do it
+```{r}
+linRegCode2 <- nimbleCode({
+  for (i in 1:N){
+    price[i] ~ dnorm(mean = mu[i], sd = s[i])
+    mu[i] <- intercept + slope*pages[i]
+    s[i] <- sqrt(exp(b0 + b1*pages[i]))
+  }
+  
+  # Priors
+  intercept ~ dunif(-100,500)
+  slope ~ dunif(-5,15)
+  
+  # the intercept and slope of the linear combinations used to model the variance
+  b0 ~ dnorm(0,100)
+  b1 ~ dnorm(0,5) 
+  
+})
+
+
+bookConsts2 <- list(N=N, pages=pages)
+bookData2 <- list(price=price)
+
+
+# No data so couldn't run
+book.out2 <- nimbleMCMC(code=linRegCode2,
+                         constants=bookConsts2,
+                         data=bookData2,
+                         nchains=6,
+                         niter=50000, 
+                         nburnin=10000, 
+                         thin=20, 
+                         samplesAsCodaMCMC = TRUE,
+                         summary=TRUE,
+                         WAIC=TRUE,
+                         monitors=c('intercept','slope','b0','b1'))
+```
+
+
+## Diagnostics 2
+```{r}
+gelman.diag(book.out2$samples, multivariate = F, transform = T)
+allsamps2 <- as.matrix(book.out2$samples)
+```
+
+```{r}
+raftery.diag(allsamps2)
+effectiveSize(allsamps2)
+```
+
+```{r}
+plot(allsamps2[,1],type='l')
+plot(allsamps2[,2],type='l')
+plot(allsamps2[,3],type='l')
+plot(allsamps2[,4],type='l')
+
+```
+
+```{r}
+book.out2$summary
+book.out$WAIC
+```
+
+
+
+## ???
+```{r}
+# sqrt(exp(.25 + 0.016*100))
+
+# to add the lines for each slope and intercept to the 
+plot(pages,price)
+for(i in 1:1000){abline(allsamps2[i,3],allsamps2[i,4])}
+```
+
+# A Different Heteroskedastic Model
+```{r}
+linRegCode3 <- nimbleCode({
+  for (i in 1:N){
+    price[i] ~ dnorm(mean = mu[i], sd = s[i])
+    mu[i] <- intercept + slope*pages[i]
+    s[i] <- sqrt(abs(b0 + b1*pages[i])) #???
+  }
+  
+  # Priors
+  intercept ~ dunif(-100,500)
+  slope ~ dunif(-5,15)
+  
+  # the intercept and slope of the linear combinations used to model the variance
+  b0 ~ dnorm(0,100)
+  b1 ~ dnorm(0,5) 
+  
+})
+
+
+bookConsts2 <- list(N=N, pages=pages)
+bookData2 <- list(price=price)
+
+
+# No data so couldn't run
+book.out3 <- nimbleMCMC(code=linRegCode2,
+                         constants=bookConsts2,
+                         data=bookData2,
+                         nchains=6,
+                         niter=50000, 
+                         nburnin=10000, 
+                         thin=20, 
+                         samplesAsCodaMCMC = TRUE,
+                         summary=TRUE,
+                         WAIC=TRUE,
+                         monitors=c('intercept','slope','b0','b1'))
+```
+
+
