@@ -1,0 +1,131 @@
+---
+title: "Books and Prices"
+author: "Josh Bergstrom"
+format: pdf
+editor: visual
+---
+
+```{r warning=FALSE, message=FALSE}
+library(nimble)
+library(coda)
+```
+
+```{r}
+book <- read.table("BookCost.dat", header=T)
+price <- book$Price.Y.
+pages <- book$Pages.X.
+```
+
+```{r}
+plot(pages, price, ylim=c(-50, 220))
+```
+
+
+```{r}
+N <- length(price)
+linregCode <- nimbleCode({
+  for(i in 1:N){
+    price[i]~dnorm(mu[i], sd=s)
+    mu[i] <- intercept + slope*pages[i]
+  }
+  # Priors
+  intercept ~ dunif(-100, 500)
+  slope ~ dunif(-5, 15)
+  s ~ dgamma(2, .05)
+})
+
+bookConst <- list(N=N, pages=pages)
+bookData <- list(price=price)
+
+book.out <- nimbleMCMC(code = linregCode,
+                       constants = bookConst,
+                       data = bookData,
+                       niter = 50000,
+                       nburnin = 10000,
+                       thin = 20,
+                       nchains = 5,
+                       samplesAsCodaMCMC = T,
+                       summary = T,
+                       WAIC = T,
+                       monitors = c("intercept", "slope", "s")
+                       # you can monitor "mu" if you want
+                       )
+```
+
+```{r}
+gelman.diag(book.out$samples)
+
+
+allsamps <- as.matrix(book.out$samples)
+
+raftery.diag(allsamps)
+effectiveSize(allsamps)
+```
+
+```{r}
+cor(allsamps[,1], allsamps[,3])
+```
+
+```{r}
+# Nimble puts the columns in alphabetical order
+plot(allsamps[,1], type="l")
+plot(allsamps[,2], type="l")
+plot(allsamps[,3], type="l")
+```
+
+```{r}
+book.out$summary
+```
+
+```{r}
+# This (xx) gets you x-coordinates to build confidence intervals around.
+# The sequencing is arbitrary. Play around with different values.
+xx <- seq(0, 1100, by=50)
+
+# Plot the first line
+plot(xx, allsamps[1,1] + allsamps[1,3]*xx, type="l", ylim=c(-50,220),
+     xlab = "pages", ylab="price")
+
+# This for-loops simulates the rest of the lines
+# Gives some idea of how much variability is in the lines
+for(i in 2:1000){
+  abline(allsamps[i,1], allsamps[i,3], col="lightgray")
+}
+
+# This for-loop gets you y-coordinates to build confidence intervals around.
+test <- matrix(0, 1000, 23)
+for(i in 1:1000){
+  for(j in 1:23){
+    test[i,j] <- allsamps[i,1] + allsamps[i,3]*xx[j]
+  }
+}
+
+test1 <- apply(test, 2, quantile, c(.025,.975))
+
+# Lower Conf. Int
+lines(xx, test1[1,], lty=2, col = "blue")
+
+# Upper Conf. Int
+lines(xx, test1[2,], lty=2, col = "blue")
+
+# Line of Best Fit
+abline(mean(allsamps[,1]), mean(allsamps[,3]))
+
+# Actual Data Points
+points(pages, price)
+
+# Collect Posterior Predictive Points
+testp <- matrix(0, 1000, 23)
+for(i in 1:1000){
+  for(j in 1:23){
+    testp[i,j] <- rnorm(1, allsamps[i,1] + allsamps[i,3]*xx[j], allsamps[i,2])
+  }
+}
+test2 <- apply(testp, 2, quantile, c(.025, .975))
+
+# Lower Prediction Int.
+lines(xx, test2[1,], lty=2, col = "red")
+
+# Upper Prediction Int.
+lines(xx, test2[2,], lty=2, col = "red")
+```
