@@ -14,6 +14,7 @@ library(coda)
 book <- read.table("BookCost.dat", header=T)
 price <- book$Price.Y.
 pages <- book$Pages.X.
+N <- length(price)
 ```
 
 ```{r}
@@ -21,7 +22,6 @@ plot(pages, price, ylim=c(-50, 220))
 ```
 
 ```{r}
-N <- length(price)
 linregCode <- nimbleCode({
   for(i in 1:N){
     price[i]~dnorm(mu[i], sd=s)
@@ -74,6 +74,7 @@ plot(allsamps[,3], type="l")
 
 ```{r}
 book.out$summary
+book.out$WAIC
 ```
 
 ```{r}
@@ -128,3 +129,119 @@ lines(xx, test2[1,], lty=2, col = "red")
 # Upper Prediction Int.
 lines(xx, test2[2,], lty=2, col = "red")
 ```
+
+## LinReg2
+Accounts for heteroskedasticity using exponential variance model.
+Not needed for this model, but shows how it's done.
+```{r}
+linreg2Code <- nimbleCode({
+  for(i in 1:N){
+    price[i] ~ dnorm(mean=mu[i],sd=s[i])
+    mu[i] <- intercept + slope*pages[i]
+    s[i] <- sqrt(exp(b0 + b1*pages[i]))
+  }
+  intercept ~ dunif(-100, 500)
+  slope ~ dunif(-5, 15)
+  
+  # Intercept and slope to show that the model is very flexible
+  b0 ~ dnorm(0, 100)
+  b1 ~ dnorm(0, 5)
+})
+
+bookConst2 <- list(N=N, pages=pages)
+bookData2 <- list(price=price)
+
+book.out2 <- nimbleMCMC(code = linreg2Code,
+                       constants = bookConst2,
+                       data = bookData2,
+                       niter = 50000,
+                       nburnin = 10000,
+                       thin = 20,
+                       nchains = 5,
+                       samplesAsCodaMCMC = T,
+                       summary = T,
+                       WAIC = T,
+                       monitors = c("intercept", "slope", "b0", "b1")
+                       # you can monitor "mu" if you want
+                       )
+```
+```{r}
+gelman.diag(book.out2$samples)
+
+
+allsamps2 <- as.matrix(book.out2$samples)
+
+raftery.diag(allsamps2)
+effectiveSize(allsamps2)
+```
+
+```{r}
+cor(allsamps2[,1], allsamps2[,3])
+```
+
+```{r}
+# Nimble puts the columns in alphabetical order
+plot(allsamps2[,1], type="l")
+plot(allsamps2[,2], type="l")
+plot(allsamps2[,3], type="l")
+plot(allsamps2[,4], type="l")
+```
+
+```{r}
+book.out2$summary
+book.out2$WAIC
+```
+
+```{r}
+# This (xx) gets you x-coordinates to build confidence intervals around.
+# The sequencing is arbitrary. Play around with different values.
+xx <- seq(0, 1100, by=50)
+
+# Plot the first line
+plot(xx, allsamps2[1,1] + allsamps2[1,2]*xx, type="l", ylim=c(-50,220),
+     xlab = "pages", ylab="price")
+
+# This for-loops simulates the rest of the lines
+# Gives some idea of how much variability is in the lines
+for(i in 2:1000){
+  abline(allsamps2[i,1], allsamps2[i,2], col="lightgray")
+}
+
+# This for-loop gets you y-coordinates to build confidence intervals around.
+test <- matrix(0, 1000, 23)
+for(i in 1:1000){
+  for(j in 1:23){
+    test[i,j] <- allsamps[i,1] + allsamps[i,3]*xx[j]
+  }
+}
+
+test1 <- apply(test, 2, quantile, c(.025,.975))
+
+# Lower Conf. Int
+lines(xx, test1[1,], lty=2, col = "blue")
+
+# Upper Conf. Int
+lines(xx, test1[2,], lty=2, col = "blue")
+
+# Line of Best Fit
+abline(mean(allsamps[,1]), mean(allsamps[,3]))
+
+# Actual Data Points
+points(pages, price)
+
+# Collect Posterior Predictive Points
+testp <- matrix(0, 1000, 23)
+for(i in 1:1000){
+  for(j in 1:23){
+    testp[i,j] <- rnorm(1, allsamps[i,1] + allsamps[i,3]*xx[j], allsamps[i,2])
+  }
+}
+test2 <- apply(testp, 2, quantile, c(.025, .975))
+
+# Lower Prediction Int.
+lines(xx, test2[1,], lty=2, col = "red")
+
+# Upper Prediction Int.
+lines(xx, test2[2,], lty=2, col = "red")
+```
+
