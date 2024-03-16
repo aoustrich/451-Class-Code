@@ -15,13 +15,13 @@ editor: visual
 -   "The biggest mistake we can make is thinking we know more than we do. It's sometimes better to have higher prior standard deviations because that bias means we don't know as much as we think we do."
 -   "Welp... just another indicator that I'm an idiot."
 -   "Matt let me make this clear to you: You CANNOT damage your reputation... It's already down here."
-
+-   "Who needs anime when you can *mutate*?"
 
 # Fellingham Particulars
 
 -   Use density plots for parameters and histograms for data (see ch5-ANOVA/anova_predictiveDistributions.Rmd)
 -   Effective size for MCMC should be 5,000 +
-- 
+-   
 
 # Bayes v. Frequentist
 
@@ -77,8 +77,6 @@ ex: for a normal likelihood - `rnorm(1000, mean=runif(1000,200,2000), sd=rgamma(
 
 ## Posterior Predictive
 
-For each parameter in the posterior chains:
--   Sample `r = nrows of allsamps` values from the likelihood using the each chain of the parameters from the MCMC
+For each parameter in the posterior chains: - Sample `r = nrows of allsamps` values from the likelihood using the each chain of the parameters from the MCMC
 
 ex: for a normal likelihood - `rnorm(6000, mean=allsamps[,1], sd=ss)` where `allsamps` is a matrix of all the samples from the MCMC and `ss` is the column for the shared variances.
-

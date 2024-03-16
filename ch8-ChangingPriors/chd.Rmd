@@ -1,0 +1,144 @@
+---
+title: "CHD"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nimble)
+library(coda)
+
+chd <- read.table('../data/chd.dat',header=TRUE)
+```
+
+
+```{r}
+chdCode <- nimbleCode({
+  for (i in 1:N){
+    x[i] ~ dbin(p[i],nr[i])
+    p[i] ~ dbeta(1,4)
+  }
+})
+chdConsts <- list(N=8)
+chdData <- list(x=chd$CHD,
+                nr=chd$nRisk)
+chdaov.out <- nimbleMCMC(code=chdCode,
+                         constants=chdConsts,
+                         data = chdData,
+                         nchains=4,niter=8000,
+                         nburnin=2000,thin=2,
+                         samplesAsCodaMCMC=TRUE,
+                         summary=TRUE,WAIC=TRUE,
+                         monitors = c('p'))
+```
+
+
+```{r}
+chdaov.out$summary
+chdaov.out$WAIC
+gelman.diag(chdaov.out$samples)
+allsamps <- as.matrix(chdaov.out$samples)
+raftery.diag(allsamps)
+effectiveSize(allsamps)
+```
+
+
+```{r}
+allsamps[1,]
+p1 <- allsamps[,1]
+p2 <- allsamps[,2]
+p3 <- allsamps[,3]
+p4 <- allsamps[,4]
+p5 <- allsamps[,5]
+p6 <- allsamps[,6]
+p7 <- allsamps[,7]
+p8 <- allsamps[,8]
+```
+
+Building contrasts for marginals and interactions
+```{r}
+# marginals
+ccat <- (1/4)*c(1,1,1,1,-1,-1,-1,-1)
+# margCat <-  p1+p2+p3+p4
+cabE <- (1/4)*c(1,1,-1,-1,1,1,-1,-1)
+# margABE <- p1+p2-p3-p4
+cage <- (1/4)*c(1,-1,1,-1,1,-1,1,-1)
+# margAge <- p1-p2+p3-p4
+
+# contrasts for interactions
+catbyabE <- 16*ccat*cabE
+catbyage <- 16*ccat*cage
+abEbyage <- 16*cabE*cage
+all.interactions <-  64*ccat*cabE*cage
+```
+
+testing interactions
+( there are multiple ways of doing this )
+```{r}
+# 1. mean of the product of the contrasts and the samples
+mean(t(catbyage)%*%t(allsamps)>0) # ~.59 so  59% there's no interaction
+  # @ 95%, if this value (v) was .975 > v < 0.25 then we'd say there's interaction.
+
+# 2. 95% credible interval
+quantile(t(catbyage)%*%t(allsamps),c(0.025,0.975))
+plot(density(t(catbyage)%*%t(allsamps)))
+```
+
+```{r}
+mean(t(catbyabE)%*%t(allsamps)>0)
+mean(t(abEbyage)%*%t(allsamps)>0)
+```
+
+Looking at the main effects AFTER checking for significant interactions
+```{r}
+plot(density(t(ccat)%*%t(allsamps)))
+plot(density(t(cabE)%*%t(allsamps)))
+plot(density(t(cage)%*%t(allsamps)))
+```
+
+Plotting the posteriors for cell means 1 and 8
+```{r}
+plot(density(p1,adjust=2),xlim=c(0.01,0.37))
+lines(density(p8))
+mean(p8>p1) #Posterior probability that mean 8 is greater than mean 1 is 1.0?
+```
+
+see the diagram drawn in my notes:
+if we are in the high `cat` group, and we are an old person, we can see if abECG matters with 
+```{r}
+plot(density(p1,adjust=2),xlim=c(0.01,0.37))
+lines(density(p8))
+mean(p8>p6) # .55 -> 55% chance that mean 8 is greater than mean 6 so the abECG matters?
+```
+
+
+---
+
+Q: What if we say the probability of the treatment being better than not having the treatment is ~80%? 
+A: Even if it's not significant at the 95% level, we might still take the drug because the probability of it being better is still kind of high.
+```{r}
+mean((t(cabE)%*%t(allsamps))<0)
+
+```
+
+# Logistic Transform - to get log odds
+"the function of the chain is the same as the chain of the function"??
+```{r}
+lodds <- matrix(0,12000,8)
+for (i in 1:12000){
+  for (j in 1:8){
+  lodds[i,j] <- log(allsamps[i,j]/(1-allsamps[i,j]))
+  }
+}
+
+mean(t(all.interactions)%*%t(lodds)>0)
+mean(lodds[,8]>lodds[,6])
+```
+
+```{r}
+cell.lodds <- apply(lodds,2,mean)
+cell.lodds
+```
+
