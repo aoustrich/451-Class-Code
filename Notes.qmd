@@ -80,3 +80,13 @@ ex: for a normal likelihood - `rnorm(1000, mean=runif(1000,200,2000), sd=rgamma(
 For each parameter in the posterior chains: - Sample `r = nrows of allsamps` values from the likelihood using the each chain of the parameters from the MCMC
 
 ex: for a normal likelihood - `rnorm(6000, mean=allsamps[,1], sd=ss)` where `allsamps` is a matrix of all the samples from the MCMC and `ss` is the column for the shared variances.
+
+# Regression
+
+## Multiple Linear Regression
+
+- Standardize the numeric covariates
+- We put steeper priors on the coefficients to see if they come off of zero (kind of like LASSO or Elastic Net)
+
+To determine if a feature should be included, look at the lower and upper bounds of the `__.out$summary` table for all the samples to see if 0 would be in the interval.
+

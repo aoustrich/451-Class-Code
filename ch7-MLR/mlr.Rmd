@@ -1,0 +1,180 @@
+---
+title: "MLR"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nimble)
+library(coda)
+
+vo2 <- read.table('../data/vo2.dat', header=T)
+y <- vo2$MaxVO2ML
+mph <- vo2$MPH
+gender <- vo2$Gender
+bmi <- vo2$BMI
+rpe <- vo2$RPE
+hr <- vo2$HR
+age <- vo2$Age1
+ages <- (age-mean(age))/sd(age)
+bmis <- (bmi-mean(bmi))/sd(bmi)
+hrs <- (hr-mean(hr))/sd(hr)
+rpes <- (rpe- mean(rpe))/sd(rpe)
+mphs <- (mph-mean(mph))/sd(mph)
+```
+
+# About the data
+- rpe: rate of perceived exertion (0,20)
+- gender: 0 = female, 1 = male
+
+everything else is the same
+
+
+# MLR
+
+## Original Priors
+```{r}
+multregCode <- nimbleCode({
+  for (i in 1:Nobs){
+    y[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0 + bmph*mph[i] + bgen*gender[i] + bbmi*bmi[i] + brpe*rpe[i] +
+      bhr*hr[i] + bage*age[i]
+  }
+  b0 ~ dnorm(20,sd=100)
+  bmph ~ dnorm(0,sd=100)
+  bgen ~ dnorm(0,sd=100)
+  bbmi ~ dnorm(0,sd=100)
+  bage ~ dnorm(0,sd=100)
+  brpe ~ dnorm(0,sd=100)
+  bhr ~ dnorm(0,sd=100)
+  ss ~ dgamma(2,.25)
+})
+
+mrConsts <- list(Nobs=120)
+mrData <- list(y=y,age=ages,mph=mphs,gender=gender,
+bmi=bmis,rpe=rpes,hr=hrs)
+mr.out <- nimbleMCMC(code=multregCode,
+                      data=mrData,
+                      constants=mrConsts,
+                     nchains=4,niter=8000,
+                     nburnin=1000,thin=2,
+                    samplesAsCodaMCMC=TRUE,
+                    summary=TRUE,WAIC=TRUE,
+                  monitors = c('b0','bmph',
+                    'bage','bgen',
+                    'bbmi','brpe',
+                    'bhr','ss'))
+mr.out$summary
+```
+
+### then run diagnostics as normal
+```{r}
+
+gelman
+```
+
+
+## Steeper Priors
+```{r}
+multregSPCode <- nimbleCode({
+  for (i in 1:Nobs){
+    y[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0 + b_mph*mph[i] + b_gen*gender[i] + b_bmi*bmi[i] + b_rpe*rpe[i] +
+      b_hr*hr[i] + b_age*age[i]
+  }
+
+  b0 ~ dnorm(20,sd=100)
+  b_mph ~ ddexp(0,var=.25)
+  b_gen ~ dnorm(0,sd=3)
+  b_bmi ~ ddexp(0,var=.25)
+  b_age ~ ddexp(0,var=.25)
+  b_rpe ~ ddexp(0,var=.25)
+  b_hr ~ ddexp(0,var=.25)
+  ss ~ dgamma(2,.25)
+  
+})
+
+mrspConsts <- list(Nobs=120)
+mrspData <- list(y=y,age=ages,mph=mphs,gender=gender,
+                 bmi=bmis,rpe=rpes,hr=hrs)
+
+mrsp.out <- nimbleMCMC(code=multregSPCode,
+                      data=mrspData,
+                      constants=mrspConsts,
+                     nchains=4,niter=8000,
+                     nburnin=1000,thin=2,
+                    samplesAsCodaMCMC=TRUE,
+                    summary=TRUE,WAIC=TRUE,
+                  monitors = c('b0','b_mph',
+                    'b_age','b_gen',
+                    'b_bmi','b_rpe',
+                    'b_hr','ss'))
+
+
+
+mrsp.out$summary
+```
+
+
+### Diagnostics
+```{r}
+mrsp.out$WAIC
+gelman.diag(mrsp.out$samples)
+allsampsSP <- as.matrix(mrsp.out$samples)
+effectiveSize(allsampsSP)
+raftery.diag(allsampsSP)
+```
+
+
+## Reduced Model (After using steeper priors)
+
+RED for Reduced
+
+```{r}
+multregREDCode <- nimbleCode({
+  for (i in 1:Nobs){
+    y[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0 + b_mph*mph[i] + b_gen*gender[i] + b_bmi*bmi[i] #+ 
+      # b_rpe*rpe[i] + b_hr*hr[i] + b_age*age[i]
+  }
+
+  b0 ~ dnorm(20,sd=100)
+  b_mph ~ ddexp(0,var=.25)
+  b_gen ~ dnorm(0,sd=3)
+  b_bmi ~ ddexp(0,var=.25)
+  # b_age ~ ddexp(0,var=.25)
+  # b_rpe ~ ddexp(0,var=.25)
+  # b_hr ~ ddexp(0,var=.25)
+  ss ~ dgamma(2,.25)
+  
+})
+
+mrREDConsts <- list(Nobs=120)
+mrREDData <- list(y=y,mph=mphs,gender=gender,bmi=bmis)
+
+mrRED.out <- nimbleMCMC(code=multregREDCode,
+                      data=mrREDData,
+                      constants=mrREDConsts,
+                     nchains=4,niter=10000,
+                     nburnin=1000,thin=2,
+                    samplesAsCodaMCMC=TRUE,
+                    summary=TRUE,WAIC=TRUE,
+                  monitors = c('b0','b_mph',
+                    'b_gen','b_bmi','ss'))
+
+mrRED.out$summary
+```
+
+### Diagnostics
+```{r}
+mrRED.out$WAIC
+gelman.diag(mrRED.out$samples)
+allsampsRED <- as.matrix(mrRED.out$samples)
+effectiveSize(allsampsRED)
+raftery.diag(allsampsRED)
+autocorr.diag(as.mcmc(allsampsRED))
+```
+
