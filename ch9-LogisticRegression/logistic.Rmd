@@ -1,0 +1,46 @@
+---
+title: "Logistic"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nimble)
+library(coda)
+
+outside <- read.table('../data/outside.dat',header=TRUE)
+```
+
+```{r}
+killprobCode <- nimbleCode({
+  for (i in 1:n){
+    y[i] ~ dbern(p[i]) # or dbin(n=1,p[i])
+    logit(p[i]) <- b0 + b_time*time[i]
+    # alterntatively
+    # p[i] <- ilogit(b0 +b_time*time[i])
+  }
+  b0 ~ dnorm(0, sd=100)
+  b_time ~ dnorm(0, sd=100)
+})
+y <- outside$response
+```
+
+
+# notes from `lreg.R`
+
+on line 53 `lines(ttt,ppp,...)`the black line above all the lightblue lines tells Gil that there might not be a lot of data in the -2 or -3 time range. Same for adding the red lines.
+
+Problems with logistic regression:
+- it's not flexible so the lines don't really work well?
+
+# notes from `probitreg.R`
+
+# notes from `quadratic.R`
+
+Had some problems converging so used initial `inits` in the `nimbleMCMC` function
+- had rough idea of the values from previous runs
+- could use the same values for each chain but it's a good idea to use some different starting points and see if they all converge to the same place (verified via `gelman.diag`).
+- chose initial values that span the space (ish)
+

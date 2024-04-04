@@ -1,0 +1,228 @@
+---
+title: "Hierarchical?"
+author: "Aaron Oustrich"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nimble)
+library(coda)
+
+dat <- read.table("../data/wheatmoisture.dat", header=TRUE)
+```
+
+# Independent Data
+
+- doesn't model wheat variety so Gil says this is wrong but could get a good answer
+
+```{r}
+wheatIndepCode <- nimbleCode({
+  for (i in 1:N){
+    yield[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0 + b1*moist[i] 
+  }
+  b0 ~ dnorm(30,sd=100)
+  b1 ~ dnorm(0, sd = 10)
+  ss ~ dgamma(1.1,1)
+})
+
+N <- 60
+Nvar <- 10
+
+moistIndepConsts <- list(N=N)
+moistData <- list(yield = dat$yield, 
+                 moist = dat$moisture)
+moistIndep.out <- nimbleMCMC(code=wheatIndepCode,
+                             constants=moistIndepConsts,
+                             data=moistData,
+                             nchains=5,
+                             niter=202000,
+                             nburnin=2000,
+                             thin=100,
+                             samplesAsCodaMCMC = TRUE,
+                             summary=TRUE, WAIC=TRUE,
+                             monitors=c('b0','b1','ss'))
+```
+
+```{r}
+moistIndep.out$summary$all.chains
+gelman.diag(moistIndep.out$samples)
+allsamps <- as.matrix(moistIndep.out$samples)
+raftery.diag(allsamps)
+effectiveSize(allsamps)
+autocorr.diag(as.mcmc(allsamps))
+```
+
+## Metrics
+$\hat{\beta_0}$: 30.64
+$\hat{\beta_1}$: 0.74
+$\hat{\sigma}$: 3.87
+$\hat{\sigma}^2$: 14.98
+WAIC: 338.65
+
+# Fixed
+
+This is good only for the 10 varieties and doesn't generalize to an 11th variety
+```{r}
+wheatFixedCode <- nimbleCode({
+  for (i in 1:N){
+    yield[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0[variety[i]] + b1[variety[i]]*moist[i]
+  }
+  
+  for (i in 1:Nvar){
+    b0[i] ~ dnorm(30,sd=100)
+    b1[i] ~ dnorm(0, sd = 10)
+  }
+  
+  ss ~ dgamma(1.1,1)
+})
+
+N <- 60
+Nvar <- 10 # number of varieties
+
+moistFixedConsts <- list(N=N, Nvar = Nvar)
+moistFixedData <- list(yield = dat$yield, 
+                 moist = dat$moisture,
+                 variety = dat$variety)
+moistFixed.out <- nimbleMCMC(code=wheatFixedCode,
+                             constants=moistFixedConsts,
+                             data=moistFixedData,
+                             nchains=5,
+                             niter=202000,
+                             nburnin=2000,
+                             thin=100,
+                             samplesAsCodaMCMC = TRUE,
+                             summary=TRUE, WAIC=TRUE,
+                             monitors=c('b0','b1','ss'))
+```
+
+
+```{r}
+moistFixed.out$summary$all.chains
+gelman.diag(moistFixed.out$samples)
+allsamps2 <- as.matrix(moistFixed.out$samples)
+raftery.diag(allsamps2)
+effectiveSize(allsamps2)
+autocorr.diag(as.mcmc(allsamps2))
+```
+
+## Metrics
+
+$\hat{\beta_0}$: 
+$\hat{\beta_1}$: 
+$\hat{\sigma}$: 0.61
+$\hat{\sigma}^2$: 0.372
+WAIC: 128.5
+
+# Random Intercepts
+
+- we get variety to variety variance so we can make inference about a variety we don't have (this fixes the shortcomings of the Fixed model)
+```{r}
+wheatRintCode <- nimbleCode({
+  for (i in 1:N){
+    yield[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0[variety[i]] + b1*moist[i]
+  }
+  
+  for (i in 1:Nvar){
+    b0[i] ~ dnorm(mub0,sd=sint)
+
+  }
+  
+  b1 ~ dnorm(0, sd = 10)
+  mub0 ~ dnorm(30,sd=100)
+  sint ~ dgamma(1.1,.1)
+  ss ~ dgamma(1.1,1)
+})
+
+N <- 60
+Nvar <- 10 # number of varieties
+
+moistRintConsts <- list(N=N, Nvar = Nvar,variety = dat$variety)
+moistRintData <- list(yield = dat$yield, 
+                 moist = dat$moisture
+                 )
+moistRint.out <- nimbleMCMC(code=wheatRintCode,
+                             constants=moistRintConsts,
+                             data=moistRintData,
+                             nchains=5,
+                             niter=202000,
+                             nburnin=2000,
+                             thin=100,
+                             samplesAsCodaMCMC = TRUE,
+                             summary=TRUE, WAIC=TRUE,
+                             monitors=c('b0','b1','ss','mub0','sint'))
+
+moistRint.out$summary$all.chains
+```
+
+$\hat{\mu}_{\beta_1}$: 33.04
+$\hat{\beta_1}$: 0.67
+$\hat{mub0}$:  33.01
+$\hat{\sigma}$: 0.88
+$\hat{\sigma}^2$: 0.774
+$\hat{\sint}$: 4.68
+$\hat{\sint}^2$: 21.902
+WAIC: 168.1
+
+So a new variety would the same slope as the others but we could infer that the intercept would be around 33 +/- 2*4.69 ( which would be 23.62 to 42.38)
+
+# Fully Randomized
+```{r}
+wheatFullRandCode <- nimbleCode({
+  for (i in 1:N){
+    yield[i] ~ dnorm(mu[i],sd=ss)
+    mu[i] <- b0[variety[i]] + b1[variety[i]]*moist[i]
+  }
+  
+  for (i in 1:Nvar){
+    b0[i] ~ dnorm(mub0,sd=sint)
+    b1[i] ~ dnorm(mub1, sd = sslp)
+
+  }
+  
+  mub0 ~ dnorm(30,sd=100)
+  mub1 ~ dnorm(0,sd=10)
+  sint ~ dgamma(1.1,.1)
+  sslp ~ dgamma(1.1,1)
+  ss ~ dgamma(1.1,1)
+})
+
+N <- 60
+Nvar <- 10 # number of varieties
+
+moistRintConsts <- list(N=N, Nvar = Nvar,variety = dat$variety)
+moistRintData <- list(yield = dat$yield, 
+                 moist = dat$moisture
+                 )
+moistFullRand.out <- nimbleMCMC(code=wheatFullRandCode,
+                             constants=moistRintConsts,
+                             data=moistRintData,
+                             nchains=5,
+                             niter=202000,
+                             nburnin=2000,
+                             thin=100,
+                             samplesAsCodaMCMC = TRUE,
+                             summary=TRUE, WAIC=TRUE,
+                             monitors=c('b0','b1','ss','mub0','sint','mub1','sslp'))
+
+moistFullRand.out$summary$all.chains
+moistFullRand.out$WAIC
+```
+
+## Metrics
+$\hat{\mu}_{\beta_1}$:
+$\hat{\beta_1}$: 
+$\hat{mub0}$:  33.40
+$\hat{mub1}$:  33.40
+$\hat{\sigma}$: 0.61
+$\hat{\sigma}^2$: 
+$\hat{\sint}$: 4.87
+$\hat{\sint}^2$: 
+$\hat{\slps}$: 0.06
+
+WAIC: 128.42
